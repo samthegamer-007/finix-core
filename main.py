@@ -1,74 +1,56 @@
-from fastapi import FastAPI, HTTPException, Header
-from fastapi.middleware.cors import CORSMiddleware
-from contextlib import asynccontextmanager
+from flask import Flask, request, jsonify
 from config import config
-from agents.finix import finix
-from schemas.messages import UserQuery, FinixResponse
 from utils.logger import get_logger
 
 logger = get_logger("main")
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    logger.info("=" * 50)
-    logger.info("FINIX AI starting up...")
-    try:
-        config.validate()
-        logger.info("Config validated ✓")
-    except EnvironmentError as e:
-        logger.warning(f"Config warning: {e}")
-    logger.info("All agents initialized ✓")
-    logger.info("FINIX AI is ready.")
-    logger.info("=" * 50)
-    yield
-    logger.info("FINIX AI shutting down.")
+app = Flask(__name__)
 
-app = FastAPI(
-    title="FINIX AI",
-    description="Multi-agent financial intelligence system",
-    version="0.1.0",
-    lifespan=lifespan
-)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-@app.get("/")
+@app.route("/")
 def root():
-    return {"system": "FINIX AI", "status": "online", "version": "0.1.0"}
+    return jsonify({"system": "FINIX AI", "status": "online", "version": "0.1.0"})
 
-@app.get("/health")
+@app.route("/health")
 def health():
-    """UptimeRobot pings this endpoint to keep the server warm."""
-    return {"status": "healthy"}
+    return jsonify({"status": "healthy"})
 
-@app.post("/api/query", response_model=FinixResponse)
-def query(payload: UserQuery):
-    """Main FINIX AI query endpoint."""
-    logger.info(f"Incoming query | user: {payload.user_id}")
+@app.route("/api/query", methods=["POST"])
+def query():
+    data = request.get_json()
+    if not data or "query" not in data:
+        return jsonify({"error": "Missing query field"}), 400
+    from schemas.messages import UserQuery
+    from agents.finix import finix
     try:
-        response = finix.handle(payload)
-        return response
+        user_query = UserQuery(
+            query=data["query"],
+            user_id=data.get("user_id", "default_user"),
+            context=data.get("context", {})
+        )
+        response = finix.handle(user_query)
+        return jsonify(response)
     except Exception as e:
-        logger.error(f"Query handler error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Query error: {e}")
+        return jsonify({"error": str(e)}), 500
 
-@app.patch("/api/account/preferences")
-def update_preferences(user_id: str, preferences: dict):
+@app.route("/api/account/preferences", methods=["PATCH"])
+def update_preferences():
+    data = request.get_json()
+    user_id = request.args.get("user_id", "default_user")
     from agents.frank import frank
-    frank.update_preferences(user_id, preferences)
-    return {"status": "updated", "user_id": user_id}
+    frank.update_preferences(user_id, data)
+    return jsonify({"status": "updated", "user_id": user_id})
 
-@app.patch("/api/account/watchlist")
-def update_watchlist(user_id: str, add: list = [], remove: list = []):
+@app.route("/api/account/watchlist", methods=["PATCH"])
+def update_watchlist():
+    data = request.get_json()
+    user_id = request.args.get("user_id", "default_user")
     from agents.frank import frank
-    frank.update_watchlist(user_id, add=add, remove=remove)
-    return {"status": "updated", "user_id": user_id}
+    frank.update_watchlist(user_id, add=data.get("add", []), remove=data.get("remove", []))
+    return jsonify({"status": "updated", "user_id": user_id})
 
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    import os
+    port = int(os.environ.get("PORT", 8000))
+    logger.info("FINIX AI starting up...")
+    app.run(host="0.0.0.0", port=port)
