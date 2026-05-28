@@ -13,11 +13,6 @@ class Kova:
         logger.info("Kova initialized")
 
     def build_analysis_prompt(self, raw_data: dict, query: str) -> str:
-        """
-        Builds Kova's question for the Gemini broker call.
-        Does not call Gemini itself — returns the prompt string.
-        FINIX bundles this with other agent prompts into one broker call.
-        """
         stock = raw_data.get("stock", {})
         news = raw_data.get("news", {})
         crypto = raw_data.get("crypto", {})
@@ -48,17 +43,14 @@ Be precise. Be structured. No fluff. Return your analysis as clean prose under 2
 
         return prompt
 
-
-            def parse_response(self, raw_response) -> dict:
-    """Parses Kova's section of the broker response into structured output."""
-    if isinstance(raw_response, dict):
-        text = str(raw_response)
-    else:
-        text = str(raw_response).strip() if raw_response else "No analysis available"
-    return {
-        "agent": "kova",
-        "intelligence_brief": text
-}
-        
+    def parse_response(self, raw_response) -> dict:
+        if isinstance(raw_response, dict):
+            text = str(raw_response)
+        else:
+            text = str(raw_response).strip() if raw_response else "No analysis available"
+        return {
+            "agent": "kova",
+            "intelligence_brief": text
+        }
 
 kova = Kova()
