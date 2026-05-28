@@ -48,11 +48,17 @@ Be precise. Be structured. No fluff. Return your analysis as clean prose under 2
 
         return prompt
 
-    def parse_response(self, raw_response: str) -> dict:
-        """Parses Kova's section of the broker response into structured output."""
-        return {
-            "agent": "kova",
-            "intelligence_brief": raw_response.strip()
-        }
+
+            def parse_response(self, raw_response) -> dict:
+    """Parses Kova's section of the broker response into structured output."""
+    if isinstance(raw_response, dict):
+        text = str(raw_response)
+    else:
+        text = str(raw_response).strip() if raw_response else "No analysis available"
+    return {
+        "agent": "kova",
+        "intelligence_brief": text
+}
+        
 
 kova = Kova()
