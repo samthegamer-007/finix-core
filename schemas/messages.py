@@ -1,5 +1,5 @@
-from pydantic import BaseModel
-from typing import Any, Optional
+from dataclasses import dataclass, field
+from typing import Any, Optional, Dict
 from enum import Enum
 
 class AgentName(str, Enum):
@@ -16,21 +16,25 @@ class MessageType(str, Enum):
     MEMORY_READ = "memory_read"
     MEMORY_WRITE = "memory_write"
 
-class AgentMessage(BaseModel):
-    sender: AgentName
-    receiver: AgentName
-    message_type: MessageType
-    payload: dict[str, Any]
-    workflow_id: Optional[str] = None
-
-class UserQuery(BaseModel):
+@dataclass
+class UserQuery:
     query: str
-    user_id: Optional[str] = "default_user"
-    context: Optional[dict[str, Any]] = {}
+    user_id: str = "default_user"
+    context: Dict[str, Any] = field(default_factory=dict)
 
-class FinixResponse(BaseModel):
+@dataclass
+class FinixResponse:
     status: str
     query: str
-    response: dict[str, Any]
+    response: Dict[str, Any]
     workflow_used: str
     user_id: str
+
+    def to_dict(self):
+        return {
+            "status": self.status,
+            "query": self.query,
+            "response": self.response,
+            "workflow_used": self.workflow_used,
+            "user_id": self.user_id
+        }
