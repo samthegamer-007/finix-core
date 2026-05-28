@@ -1,5 +1,5 @@
-from pydantic import BaseModel, Field
-from typing import Any, Optional
+from dataclasses import dataclass, field
+from typing import Any, Optional, Dict, List
 from enum import Enum
 import uuid
 from datetime import datetime
@@ -16,17 +16,18 @@ class WorkflowStatus(str, Enum):
     COMPLETED = "completed"
     FAILED = "failed"
 
-class WorkflowState(BaseModel):
-    workflow_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+@dataclass
+class WorkflowState:
     workflow_type: WorkflowType
-    status: WorkflowStatus = WorkflowStatus.PENDING
     user_id: str
     original_query: str
-    active_agents: list[str] = []
-    context: dict[str, Any] = {}       # memory injected by Frank before workflow
-    results: dict[str, Any] = {}       # accumulated agent results
-    final_response: Optional[dict] = None
-    created_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
+    workflow_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    status: WorkflowStatus = WorkflowStatus.PENDING
+    active_agents: List[str] = field(default_factory=list)
+    context: Dict[str, Any] = field(default_factory=dict)
+    results: Dict[str, Any] = field(default_factory=dict)
+    final_response: Optional[Dict] = None
+    created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
     completed_at: Optional[str] = None
 
     def mark_running(self):
