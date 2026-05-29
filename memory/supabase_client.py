@@ -1,16 +1,18 @@
-"""
-Supabase client — wired in Phase 7.
-Placeholder for now. Frank uses in-memory dict until this is connected.
-"""
+from supabase import create_client, Client
+from config import config
 from utils.logger import get_logger
 
 logger = get_logger("supabase_client")
 
 class SupabaseClient:
     def __init__(self):
-        logger.info("SupabaseClient stub initialized (Phase 7)")
+        self.client: Client = create_client(
+            config.SUPABASE_URL,
+            config.SUPABASE_KEY
+        )
+        logger.info("Supabase client initialized")
 
-    def connect(self):
-        raise NotImplementedError("Supabase connection wired in Phase 7")
+    def get(self) -> Client:
+        return self.client
 
 supabase_client = SupabaseClient()
