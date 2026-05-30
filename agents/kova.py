@@ -5,6 +5,7 @@ Handles: sentiment, trends, macro context, preliminary risk.
 Cold, clinical, precise. Does not fetch — always uses Rome.
 """
 from utils.logger import get_logger
+import json
 
 logger = get_logger("kova")
 
@@ -12,35 +13,32 @@ class Kova:
     def __init__(self):
         logger.info("Kova initialized")
 
-    def build_analysis_prompt(self, raw_data: dict, query: str) -> str:
-        stock = raw_data.get("stock", {})
-        news = raw_data.get("news", {})
-        crypto = raw_data.get("crypto", {})
+    def build_analysis_prompt(self, processed_data: dict, query: str) -> str:
+        data_str = json.dumps(processed_data, indent=2)[:3000]
+        prompt = f"""You are KOVA, market intelligence layer inside FINIX AI.
 
-        data_summary = ""
-        if stock and not stock.get("error"):
-            data_summary += f"STOCK DATA: {stock}\n"
-        if crypto and not crypto.get("error"):
-            data_summary += f"CRYPTO DATA: {crypto}\n"
-        if news and not news.get("error"):
-            articles = news.get("articles", [])[:5]
-            headlines = [a.get("title", "") for a in articles]
-            data_summary += f"RECENT NEWS HEADLINES: {headlines}\n"
-
-        prompt = f"""You are KOVA, a market intelligence analyst inside the FINIX AI system.
 User query: "{query}"
 
-Raw market data provided:
-{data_summary}
+Pre-processed structured data:
+{data_str}
 
-Your job:
-1. Identify the key market trend (bullish/bearish/neutral) with brief reasoning
-2. Summarize the most relevant news sentiment (1-2 sentences)
-3. Flag any notable risks or macro signals visible in the data
-4. Prepare a concise intelligence brief for the financial reasoning layer
+Your responsibilities:
+1. TREND: Identify dominant market trend from quantitative evidence
+2. SENTIMENT: Assess market sentiment from performance metrics and news facts
+3. NARRATIVES: Identify key market narratives visible in the data
+4. RISKS: Flag specific risk signals from the metrics
+5. CONTEXT: Provide relevant macro or sector context
 
-Be precise. Be structured. No fluff. Return your analysis as clean prose under 200 words."""
-
+CRITICAL RULES:
+- Reason from evidence to conclusion. Never from source to conclusion.
+- WRONG: "Reuters reports inflation is falling therefore inflation is falling"
+- RIGHT: "CPI data shows inflation declined from X% to Y% in the latest reading"
+- Cite specific numbers from the data. Do not invent figures.
+- Do not perform calculations — numbers are pre-computed.
+- Do not rank assets — rankings are pre-computed.
+- Never mention source names as justification for a conclusion.
+- Be analytical, concise, institutional in tone.
+- Max 250 words. Clean prose. No headers."""
         return prompt
 
     def parse_response(self, raw_response) -> dict:
@@ -48,9 +46,6 @@ Be precise. Be structured. No fluff. Return your analysis as clean prose under 2
             text = str(raw_response)
         else:
             text = str(raw_response).strip() if raw_response else "No analysis available"
-        return {
-            "agent": "kova",
-            "intelligence_brief": text
-        }
+        return {"agent": "kova", "intelligence_brief": text}
 
 kova = Kova()
