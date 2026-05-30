@@ -20,7 +20,6 @@ class Frank:
             result = self.db.table("users").select(
                 "user_id, preferences, watchlist"
             ).eq("user_id", user_id).execute()
-
             if result.data:
                 user = result.data[0]
                 insights = self._get_recent_insights(user_id)
@@ -30,12 +29,7 @@ class Frank:
                     "watchlist": user.get("watchlist", []),
                     "recent_insights": insights
                 }
-            return {
-                "user_id": user_id,
-                "preferences": {},
-                "watchlist": [],
-                "recent_insights": []
-            }
+            return {"user_id": user_id, "preferences": {}, "watchlist": [], "recent_insights": []}
         except Exception as e:
             logger.error(f"Frank read error: {e}")
             return {"user_id": user_id, "preferences": {}, "watchlist": [], "recent_insights": []}
@@ -60,13 +54,11 @@ class Frank:
                 "query": summary.get("query", ""),
                 "result": summary.get("result", {})
             }).execute()
-
             self.db.table("insights").insert({
                 "user_id": user_id,
                 "workflow_id": workflow_id,
                 "summary": summary
             }).execute()
-
             logger.debug(f"Frank wrote workflow result for: {user_id}")
         except Exception as e:
             logger.error(f"Frank write error: {e}")
@@ -85,11 +77,9 @@ class Frank:
             result = self.db.table("users").select(
                 "watchlist"
             ).eq("user_id", user_id).execute()
-
             current = set(result.data[0].get("watchlist", []) if result.data else [])
             current.update(add)
             current.difference_update(remove)
-
             self.db.table("users").update({
                 "watchlist": list(current)
             }).eq("user_id", user_id).execute()
