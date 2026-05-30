@@ -1,6 +1,7 @@
 from schemas.messages import UserQuery, FinixResponse
 from schemas.workflow_state import WorkflowState, WorkflowType
 from agents.frank import frank
+from services.gemini_service import gemini_service
 from utils.logger import get_logger
 
 logger = get_logger("finix")
@@ -54,11 +55,26 @@ class Finix:
         ).to_dict()
 
     def _select_workflow(self, query: str) -> WorkflowType:
-        q = query.lower()
-        decision_keywords = ["should i buy", "should i sell", "invest", "worth buying", "good investment", "trade"]
-        if any(kw in q for kw in decision_keywords):
-            return WorkflowType.DECISION
-        return WorkflowType.RESEARCH
+        prompt = f"""You are FINIX, a financial intelligence orchestrator.
+Classify this user query into exactly one workflow type.
+
+RESEARCH: queries asking for information, analysis, news, market data, trends, explanations, comparisons, historical performance
+DECISION: queries explicitly asking what to DO — buy, sell, invest, allocate, recommend an action
+
+User query: "{query}"
+
+Respond with exactly one word: RESEARCH or DECISION"""
+
+        try:
+            result = gemini_service.call(prompt).strip().upper()
+            if "DECISION" in result:
+                logger.info("FINIX classified workflow: DECISION")
+                return WorkflowType.DECISION
+            logger.info("FINIX classified workflow: RESEARCH")
+            return WorkflowType.RESEARCH
+        except Exception as e:
+            logger.warning(f"Workflow classification failed, defaulting to RESEARCH: {e}")
+            return WorkflowType.RESEARCH
 
     def _execute_workflow(self, state: WorkflowState, query: UserQuery) -> WorkflowState:
         if state.workflow_type in (WorkflowType.RESEARCH, WorkflowType.DECISION):
