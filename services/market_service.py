@@ -1,11 +1,8 @@
-"""
-Market data service used exclusively by Rome.
-Fetches stock and crypto data via yfinance and CoinGecko.
-"""
 import yfinance as yf
 import requests
 import pandas as pd
-from datetime import datetime, timedelta
+import time
+from datetime import datetime
 from utils.logger import get_logger
 
 logger = get_logger("market_service")
@@ -13,26 +10,21 @@ logger = get_logger("market_service")
 COINGECKO_BASE = "https://api.coingecko.com/api/v3"
 MFAPI_BASE = "https://api.mfapi.in/mf"
 
-NIFTY500_TICKERS = [
+# Fallback list — only used if NSE website is unreachable
+NIFTY500_FALLBACK = [
     "RELIANCE.NS", "TCS.NS", "HDFCBANK.NS", "ICICIBANK.NS", "INFY.NS",
     "HINDUNILVR.NS", "ITC.NS", "SBIN.NS", "BHARTIARTL.NS", "KOTAKBANK.NS",
     "LT.NS", "AXISBANK.NS", "ASIANPAINT.NS", "MARUTI.NS", "TITAN.NS",
     "BAJFINANCE.NS", "WIPRO.NS", "ULTRACEMCO.NS", "NESTLEIND.NS", "POWERGRID.NS",
     "NTPC.NS", "ONGC.NS", "TECHM.NS", "HCLTECH.NS", "SUNPHARMA.NS",
     "DRREDDY.NS", "DIVISLAB.NS", "CIPLA.NS", "APOLLOHOSP.NS", "BAJAJFINSV.NS",
-    "ADANIENT.NS", "ADANIPORTS.NS", "ADANIGREEN.NS", "TATAMOTORS.NS", "TATASTEEL.NS",
-    "TATACONSUM.NS", "JSWSTEEL.NS", "HINDALCO.NS", "VEDL.NS", "COALINDIA.NS",
-    "BPCL.NS", "IOC.NS", "GAIL.NS", "INDUSINDBK.NS", "EICHERMOT.NS",
-    "HEROMOTOCO.NS", "BAJAJ-AUTO.NS", "BRITANNIA.NS", "DABUR.NS", "MARICO.NS",
-    "GODREJCP.NS", "COLPAL.NS", "PIDILITIND.NS", "BERGEPAINT.NS", "HAVELLS.NS",
-    "VOLTAS.NS", "SIEMENS.NS", "ABB.NS", "BOSCHLTD.NS", "CUMMINSIND.NS",
-    "PAGEIND.NS", "TRENT.NS", "NYKAA.NS", "DMART.NS", "ZOMATO.NS",
-    "NAUKRI.NS", "INDIGO.NS", "IRCTC.NS", "CONCOR.NS", "DLF.NS",
-    "GODREJPROP.NS", "OBEROIRLTY.NS", "BANKBARODA.NS", "PNB.NS", "CANBK.NS",
-    "UNIONBANK.NS", "FEDERALBNK.NS", "IDFCFIRSTB.NS", "BANDHANBNK.NS", "CHOLAFIN.NS",
-    "MUTHOOTFIN.NS", "LICHSGFIN.NS", "RECLTD.NS", "PFC.NS", "IRFC.NS",
-    "NHPC.NS", "SJVN.NS", "TATAPOWER.NS", "ADANIPOWER.NS", "TORNTPOWER.NS",
-    "AUROPHARMA.NS", "LUPIN.NS", "BIOCON.NS", "ALKEM.NS", "TORNTPHARM.NS",
+    "ADANIENT.NS", "ADANIPORTS.NS", "TATAMOTORS.NS", "TATASTEEL.NS", "JSWSTEEL.NS",
+    "HINDALCO.NS", "COALINDIA.NS", "BPCL.NS", "IOC.NS", "INDUSINDBK.NS",
+    "EICHERMOT.NS", "HEROMOTOCO.NS", "BAJAJ-AUTO.NS", "BRITANNIA.NS", "DABUR.NS",
+    "GODREJCP.NS", "COLPAL.NS", "HAVELLS.NS", "PAGEIND.NS", "TRENT.NS",
+    "NYKAA.NS", "DMART.NS", "ZOMATO.NS", "NAUKRI.NS", "INDIGO.NS",
+    "IRCTC.NS", "DLF.NS", "BANKBARODA.NS", "PNB.NS", "RECLTD.NS",
+    "PFC.NS", "IRFC.NS", "TATAPOWER.NS", "AUROPHARMA.NS", "LUPIN.NS",
     "MPHASIS.NS", "LTIM.NS", "PERSISTENT.NS", "COFORGE.NS", "KPITTECH.NS"
 ]
 
@@ -54,8 +46,37 @@ TOP_MF_SCHEMES = {
 
 class MarketService:
 
+    def _get_nifty500_tickers(self) -> list:
+        """
+        Fetches the live Nifty 500 constituent list from NSE India.
+        Returns list of tickers with .NS suffix for yfinance.
+        Falls back to hardcoded core list if fetch fails.
+        """
+        try:
+            url = "https://nsearchives.nseindia.com/content/indices/ind_nifty500list.csv"
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "Referer": "https://www.nseindia.com"
+            }
+            resp = requests.get(url, headers=headers, timeout=15)
+            resp.raise_for_status()
+            lines = resp.text.strip().split("\n")
+            tickers = []
+            for line in lines[1:]:
+                parts = line.strip().split(",")
+                if parts and parts[0].strip():
+                    symbol = parts[0].strip()
+                    tickers.append(f"{symbol}.NS")
+            logger.info(f"Fetched {len(tickers)} Nifty 500 tickers from NSE")
+            return tickers
+        except Exception as e:
+            logger.warning(f"NSE ticker fetch failed — using fallback list: {e}")
+            return NIFTY500_FALLBACK
+
     def get_stock_data(self, ticker: str) -> dict:
         try:
+            time.sleep(1)
             stock = yf.Ticker(ticker.upper())
             info = stock.info
             return {
@@ -80,6 +101,7 @@ class MarketService:
 
     def get_stock_history(self, ticker: str, start: str, end: str) -> dict:
         try:
+            time.sleep(1)
             data = yf.download(ticker.upper(), start=start, end=end, progress=False)
             if data.empty:
                 return {"error": f"No data for {ticker} in range {start} to {end}"}
@@ -106,6 +128,7 @@ class MarketService:
 
     def get_bulk_stock_history(self, tickers: list, start: str, end: str) -> dict:
         try:
+            time.sleep(1)
             ticker_str = " ".join(tickers)
             data = yf.download(ticker_str, start=start, end=end, progress=False)
             if data.empty:
@@ -135,8 +158,10 @@ class MarketService:
             logger.error(f"Bulk stock history error: {e}")
             return {"error": str(e)}
 
-    def get_nifty500_weekly_data(self, start: str, end: str, limit: int = 100) -> dict:
-        tickers = NIFTY500_TICKERS[:limit]
+    def get_nifty500_weekly_data(self, start: str, end: str, limit: int = 500) -> dict:
+        tickers = self._get_nifty500_tickers()
+        if limit < len(tickers):
+            tickers = tickers[:limit]
         logger.info(f"Fetching Nifty500 | {len(tickers)} tickers | {start} to {end}")
         return self.get_bulk_stock_history(tickers, start, end)
 
