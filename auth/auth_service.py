@@ -16,10 +16,8 @@ class AuthService:
             existing = self.db.table("users").select("user_id").eq("username", username).execute()
             if existing.data:
                 return {"error": "Username already exists"}
-
             password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
             user_id = str(uuid.uuid4())
-
             self.db.table("users").insert({
                 "user_id": user_id,
                 "username": username,
@@ -29,10 +27,8 @@ class AuthService:
                 "preferences": {},
                 "watchlist": []
             }).execute()
-
             logger.info(f"New user registered: {username}")
             return {"success": True, "user_id": user_id, "username": username}
-
         except Exception as e:
             logger.error(f"Register error: {e}")
             return {"error": str(e)}
@@ -42,23 +38,18 @@ class AuthService:
             result = self.db.table("users").select(
                 "user_id, username, password_hash"
             ).eq("username", username).execute()
-
             if not result.data:
                 return {"error": "Invalid username or password"}
-
             user = result.data[0]
             if not bcrypt.checkpw(password.encode(), user["password_hash"].encode()):
                 return {"error": "Invalid username or password"}
-
             token = secrets.token_urlsafe(32)
             expires_at = (datetime.utcnow() + timedelta(days=30)).isoformat()
-
             self.db.table("sessions").insert({
                 "token": token,
                 "user_id": user["user_id"],
                 "expires_at": expires_at
             }).execute()
-
             logger.info(f"User logged in: {username}")
             return {
                 "success": True,
@@ -66,7 +57,6 @@ class AuthService:
                 "user_id": user["user_id"],
                 "username": username
             }
-
         except Exception as e:
             logger.error(f"Login error: {e}")
             return {"error": str(e)}
@@ -76,19 +66,14 @@ class AuthService:
             result = self.db.table("sessions").select(
                 "user_id, expires_at"
             ).eq("token", token).execute()
-
             if not result.data:
                 return {"error": "Invalid token"}
-
             session = result.data[0]
             expires_at = datetime.fromisoformat(session["expires_at"])
-
             if datetime.utcnow() > expires_at:
                 self.db.table("sessions").delete().eq("token", token).execute()
                 return {"error": "Token expired"}
-
             return {"success": True, "user_id": session["user_id"]}
-
         except Exception as e:
             logger.error(f"Token validation error: {e}")
             return {"error": str(e)}
