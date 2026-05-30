@@ -5,6 +5,7 @@ Does NOT reason. Does NOT analyze. Returns structured data only.
 Named after Roman Roy (Succession) — executes, doesn't overthink.
 """
 import json
+import time
 from utils.logger import get_logger
 from services.gemini_service import gemini_service
 
@@ -114,82 +115,115 @@ Rules:
             logger.debug(f"Rome fetched: {key}")
         return results
 
-    def _fetch_stock(self, params):
+    def _fetch_stock(self, params: dict) -> dict:
         from services.market_service import market_service
         ticker = params.get("ticker", "")
-        if not ticker: return {"error": "No ticker provided"}
-        return market_service.get_stock_data(ticker)
+        if not ticker:
+            return {"error": "No ticker provided"}
+        time.sleep(1)
+        result = market_service.get_stock_data(ticker)
+        if result.get("error"):
+            logger.warning(f"Stock fetch failed for {ticker} — escalating to web search")
+            return self._fetch_web_search({
+                "query": f"{ticker} stock price current data site:reuters.com OR site:marketwatch.com OR site:cnbc.com",
+                "max_results": 3,
+                "days_back": 1
+            })
+        return result
 
-    def _fetch_stock_history(self, params):
+    def _fetch_stock_history(self, params: dict) -> dict:
         from services.market_service import market_service
         ticker = params.get("ticker", "")
         start = params.get("start", "")
         end = params.get("end", "")
-        if not all([ticker, start, end]): return {"error": "ticker, start, end required"}
-        return market_service.get_stock_history(ticker, start, end)
+        if not all([ticker, start, end]):
+            return {"error": "ticker, start, end required"}
+        time.sleep(1)
+        result = market_service.get_stock_history(ticker, start, end)
+        if result.get("error"):
+            logger.warning(f"Stock history failed for {ticker} — escalating to web search")
+            return self._fetch_web_search({
+                "query": f"{ticker} stock performance {start} to {end} site:reuters.com OR site:marketwatch.com",
+                "max_results": 3,
+                "days_back": 30
+            })
+        return result
 
-    def _fetch_bulk_stock_history(self, params):
+    def _fetch_bulk_stock_history(self, params: dict) -> dict:
         from services.market_service import market_service
         tickers = params.get("tickers", [])
         start = params.get("start", "")
         end = params.get("end", "")
-        if not all([tickers, start, end]): return {"error": "tickers, start, end required"}
+        if not all([tickers, start, end]):
+            return {"error": "tickers, start, end required"}
+        time.sleep(1)
         return market_service.get_bulk_stock_history(tickers, start, end)
 
-    def _fetch_nifty500_weekly(self, params):
+    def _fetch_nifty500_weekly(self, params: dict) -> dict:
         from services.market_service import market_service
         start = params.get("start", "")
         end = params.get("end", "")
         limit = params.get("limit", 100)
-        if not all([start, end]): return {"error": "start and end required"}
+        if not all([start, end]):
+            return {"error": "start and end required"}
+        time.sleep(1)
         return market_service.get_nifty500_weekly_data(start, end, limit)
 
-    def _fetch_mutual_fund_nav(self, params):
+    def _fetch_mutual_fund_nav(self, params: dict) -> dict:
         from services.market_service import market_service
         scheme_code = params.get("scheme_code", "")
-        if not scheme_code: return {"error": "scheme_code required"}
+        if not scheme_code:
+            return {"error": "scheme_code required"}
         return market_service.get_mutual_fund_nav(scheme_code)
 
-    def _fetch_mutual_funds_performance(self, params):
+    def _fetch_mutual_funds_performance(self, params: dict) -> dict:
         from services.market_service import market_service
         start = params.get("start", "")
         end = params.get("end", "")
-        if not all([start, end]): return {"error": "start and end required"}
+        if not all([start, end]):
+            return {"error": "start and end required"}
         return market_service.get_top_mutual_funds_performance(start, end)
 
-    def _fetch_crypto(self, params):
+    def _fetch_crypto(self, params: dict) -> dict:
         from services.market_service import market_service
         coin_id = params.get("coin_id", "")
-        if not coin_id: return {"error": "coin_id required"}
+        if not coin_id:
+            return {"error": "coin_id required"}
         return market_service.get_crypto_data(coin_id)
 
-    def _fetch_index(self, params):
+    def _fetch_index(self, params: dict) -> dict:
         from services.market_service import market_service
         symbol = params.get("index_symbol", "")
-        if not symbol: return {"error": "index_symbol required"}
+        if not symbol:
+            return {"error": "index_symbol required"}
+        time.sleep(1)
         return market_service.get_index_data(symbol)
 
-    def _fetch_index_history(self, params):
+    def _fetch_index_history(self, params: dict) -> dict:
         from services.market_service import market_service
         symbol = params.get("index_symbol", "")
         start = params.get("start", "")
         end = params.get("end", "")
-        if not all([symbol, start, end]): return {"error": "index_symbol, start, end required"}
+        if not all([symbol, start, end]):
+            return {"error": "index_symbol, start, end required"}
+        time.sleep(1)
         return market_service.get_index_history(symbol, start, end)
 
-    def _fetch_news(self, params):
+    def _fetch_news(self, params: dict) -> dict:
         from services.news_service import news_service
         query = params.get("query", "")
         limit = params.get("limit", 5)
-        if not query: return {"error": "query required"}
+        if not query:
+            return {"error": "query required"}
         return news_service.get_news(query, limit)
 
-    def _fetch_web_search(self, params):
+    def _fetch_web_search(self, params: dict) -> dict:
         from services.search_service import search_service
         query = params.get("query", "")
         max_results = params.get("max_results", 5)
         days_back = params.get("days_back", 7)
-        if not query: return {"error": "query required"}
+        if not query:
+            return {"error": "query required"}
         return search_service.search(query, max_results, days_back)
 
 rome = Rome()
