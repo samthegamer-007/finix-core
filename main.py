@@ -120,6 +120,23 @@ def update_watchlist():
     frank.update_watchlist(user_id, add=data.get("add", []), remove=data.get("remove", []))
     return jsonify({"status": "updated"})
 
+@app.route("/admin/workflow-traces", methods=["GET"])
+def workflow_traces():
+    admin_key = request.headers.get("X-Admin-Key", "")
+    if admin_key != config.ADMIN_KEY:
+        return jsonify({"error": "Unauthorized"}), 401
+    from utils.workflow_logger import workflow_logger
+    limit = int(request.args.get("limit", 10))
+    return jsonify(workflow_logger.get_recent_traces(limit))
+
+@app.route("/admin/workflow-trace/<workflow_id>", methods=["GET"])
+def workflow_trace(workflow_id):
+    admin_key = request.headers.get("X-Admin-Key", "")
+    if admin_key != config.ADMIN_KEY:
+        return jsonify({"error": "Unauthorized"}), 401
+    from utils.workflow_logger import workflow_logger
+    return jsonify(workflow_logger.get_workflow_trace(workflow_id))
+
 if __name__ == "__main__":
     import os
     port = int(os.environ.get("PORT", 8000))
