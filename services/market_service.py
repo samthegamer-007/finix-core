@@ -158,7 +158,7 @@ class MarketService:
             logger.error(f"Bulk stock history error: {e}")
             return {"error": str(e)}
 
-    def get_nifty500_weekly_data(self, start: str, end: str, limit: int = 500) -> dict:
+    def get_nifty500_weekly_data(self, start: str, end: str, limit: int = 100) -> dict:
         tickers = self._get_nifty500_tickers()
         if limit < len(tickers):
             tickers = tickers[:limit]
